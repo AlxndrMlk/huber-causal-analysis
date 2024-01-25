@@ -1,0 +1,22 @@
+name: causal-martin-huber-book
+channels:
+- defaults
+- conda-forge
+dependencies:
+- python=3.10
+- tqdm
+- pandas
+- numpy
+- scipy
+- matplotlib
+- scikit-learn
+- statsmodels
+- doubleml
+- ipykernel
+- pip
+- econml=0.14.1
+- pip:
+  - causalinference
+  - zepid
+  - dowhy
+  - rdrobust

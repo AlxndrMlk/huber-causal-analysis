@@ -1,0 +1,741 @@
+########## EMPIRICAL EXAMPLES IN PYTHON #########
+
+# Specify working directory
+import os                                       # load os library
+path = '/Causal_Analysis'                       # the path should be changed by the user
+os.chdir(path)                                  # change working directory to path
+
+# Chapter 3
+
+# 1
+import pandas as pd                                                      # load pandas library
+df = pd.read_csv('data/JC.csv')                                          # load JC data
+D = df['assignment']                                                     # define treatment (assignment to JC)
+Y = df['earny4']                                                         # define outcome (earnings in fourth year)
+Y[D==1].mean() - Y[D==0].mean()                                          # compute the ATE
+
+# 2
+import pandas as pd                                                      # load pandas library
+import statsmodels.api as sm                                             # load statsmodels library
+df = pd.read_csv('data/JC.csv')                                          # load JC data
+D = df['assignment']                                                     # define treatment (assignment to JC)
+Y = df['earny4']                                                         # define outcome (earnings in fourth year)
+D = sm.add_constant(D)                                                   # add a constant to get an intercept
+ols = sm.OLS(Y, D).fit(cov_type = 'HC0')                                 # run OLS regression with White's heteroskedasticity robust se
+print(ols.summary())                                                     # output
+
+# 3
+import numpy as np                                                                             # load numpy library
+import pandas as pd                                                                            # load pandas library
+from sklearn.linear_model import LinearRegression                                              # import linear regression
+from typing import Dict                                                                        # import dict
+from scipy.stats import norm                                                                   # import norm
+def make_bootstraps(data: np.array, n_bootstraps: int=100) -> Dict[str, Dict[str, np.array]]:  # create boot data
+    dc = {}                                                                                    # initiates empty dict
+    sample_size = data.shape[0]                                                                # get sample size  
+    idx = [i for i in range(sample_size)]                                                      # array of index
+    for b in range(n_bootstraps):                                                              # iterating over the number of boot.                                    
+        sidx   = np.random.choice(idx,replace=True,size=sample_size)                           # random index                     
+        b_samp = data.loc[sidx,:]                                                              # select boot sample
+        oob_idx = list(set(idx) - set(sidx))                                                   # get index which where not used
+        t_samp = np.array([])                                                                  # create empty array
+        if oob_idx:                                                                            # if observation where not used
+            t_samp = data.loc[oob_idx,:]                                                       # put them in test sample
+        dc['boot_'+str(b)] = {'boot':b_samp,'test':t_samp}                                     # add boot sample and test sample to dict.
+    return(dc)                                                                                 # return dict.
+df = pd.read_csv('data/JC.csv')                                                                # load JC data
+df_boot = make_bootstraps(df, 1999)                                                            # run 1999 boot data
+coefs = np.array([])                                                                           # create empty array for coefficients
+intrs = np.array([])                                                                           # create empty array for intercepts
+lr    = LinearRegression()                                                                     # load linear regression method
+for b in df_boot:                                                                              # iterate over boot data
+    lr.fit(df_boot[b]['boot'].loc[:,'assignment'].values.reshape(-1, 1),df_boot[b]['boot'].loc[:,'earny4'].values.reshape(-1, 1))   # run linear reg.
+    coefs = np.concatenate((coefs,lr.coef_.flatten()))                                         # store coefficients
+    intrs = np.concatenate((intrs,lr.intercept_.flatten()))                                    # store intercepts
+print(f'intercept: {np.mean(intrs)}\n'                                                         # print mean intercept
+      f'coeficient: {np.mean(coefs)}')                                                         # print mean coefficient
+tstat = np.mean(coefs)/np.std(coefs)                                                           # compute t-stat.
+p_val = 2*norm.cdf(-np.absolute(tstat))                                                        # compute p-val.
+print(f'tstat: {tstat}\n'                                                                      # print t-stat.
+      f'p_val: {p_val}')                                                                       # print p-val.
+
+# 4
+import pandas as pd                                                              # load pandas library
+import statsmodels.api as sm                                                     # load statsmodels library
+df = pd.read_csv('data/wexpect.csv')                                             # load wexpect data
+D1 = df['treatmentinformation']                                                  # define first treatment (wage information)
+D2 = df['treatmentorder']                                                        # define second treatment (order of questions)
+D = pd.DataFrame([D1,D2]).T                                                      # sm.OLS handle only one dataframe
+D = sm.add_constant(D)                                                           # add constant to get an intercept
+Y = df['wexpect2']                                                               # define outcome (wage expectations)
+ols = sm.OLS(Y, D).fit(cov_type = 'HC0')                                         # run OLS regression whith White's heteroskedasticity robust se
+print(ols.summary())                                                             # output
+
+# 5
+import numpy as np                                                                 # load numpy library
+import pandas as pd                                                                # load pandas library
+import statsmodels.api as sm                                                       # load statsmodels library
+import matplotlib.pyplot as plt                                                    # load matplotlib library
+import scipy.stats as st                                                           # load scipy.stats library
+df = pd.read_csv('data/marketing.csv')                                             # load marketing data
+D = df['newspaper']                                                                # define treatment (newspaper advertising)
+Y = df['sales']                                                                    # define outcome (sales)
+x_axis = np.linspace(min(D), max(D), num = 100)                                    # define points where we evaluate 
+results = sm.nonparametric.KernelReg(Y,D,'c', reg_type = 'lc').fit(x_axis)         # kernel regression
+plt.plot(x_axis, results[0], color = 'black')                                      # plot regression function
+plt.xlabel('D')                                                                    # label the x axis
+plt.ylabel('Y')                                                                    # label the y axis
+plt.show()                                                                         # show the plot
+
+# 6
+import pandas as pd                                                                  # load pandas library
+import statsmodels.api as sm                                                         # load statsmodels library
+df = pd.read_csv('data/coffeeleaflet.csv').dropna()                                  # load coffeleaflet data
+D = df['treatment']                                                                  # define treatment (leaflet)
+Y = df['awarewaste']                                                                 # define outcome (aware of waste production)
+X1 = df['mumedu']                                                                    # define first covariate (education of mum)
+X2 = df['sex']                                                                       # define second covariate (gender)
+V = pd.DataFrame([D,X1,X2]).T                                                        # join parameters (treatment + covariates)
+V = sm.add_constant(V)                                                               # add a constant to get an intercept
+ols = sm.OLS(Y, V).fit(cov_type = 'HC0')                                             # run OLS regression with White's heteroskedasticity robust se
+print(ols.summary())                                                                 # output                                      
+
+# Chapter 4
+
+# 7
+import pandas as pd                                                                           # load pandas library
+import statsmodels.api as sm                                                                  # load statsmodels library
+df = pd.read_csv('data/lalonde.csv').dropna()                                                 # load lalonde data
+D = df['treat']                                                                               # define treatment (training)
+Y = df['re78']                                                                                # define outcome
+X = df[['age', 'educ', 'nodegr', 'married', 'black', 'hisp', 're74', 're75', 'u74', 'u75']]   # define covariates
+def demeand(column):                                                                          # handmade demeaned function
+    return column.sub(column.mean())
+cols = X.columns                                                                              # get columns of covariates
+Xdemeaned = X[cols].apply(demeand)                                                            # demeaned X
+def interaction_withD(term1):                                                                 # handmade intercation function with treatment
+    return term1.mul(D)
+DXdemeaned = Xdemeaned[cols].apply(interaction_withD)                                         # intercation of D and demeaned X
+DXdemeaned.rename(columns={'age': 'age*treat',                                                # rename interaction terms
+                           'educ': 'educ*treat',
+                           'nodegr': 'nodegr*treat',
+                           'married': 'married*treat',
+                           'black': 'black*treat',
+                           'hisp': 'hisp*treat',
+                           're74': 're74*treat',
+                           're75': 're75*treat',
+                           'u74': 'u74*treat',
+                           'u75': 'u75*treat'}, inplace = True)
+V = pd.concat([D, X, DXdemeaned], axis = 1)                                                   # join parameters (treatment, covariates, intercations)
+V = sm.add_constant(V)                                                                        # add a constant to get an intercept
+ols = sm.OLS(Y, V).fit(cov_type = 'HC0')                                                      # run OLS regression with White's heteroskedasticity robust se
+print(ols.summary())                                                                          # output
+
+# 8
+from causalinference import CausalModel                                                                         # load causalmodel
+import pandas as pd                                                                                             # load pandas library
+import numpy as np                                                                                              # load numpy library
+df = pd.read_csv('data/lalonde.csv')                                                                            # load lalonde data
+Y = np.asarray(df['re78'])                                                                                      # define outcome
+D = np.asarray(df['treat'])                                                                                     # define treatment (training)
+X = np.asarray(df[['age', 'educ', 'nodegr', 'married', 'black', 'hisp', 're74', 're75', 'u74', 'u75']])         # define covariates
+model = CausalModel(Y,D,X)                                                                                      # define causal model
+model.est_via_matching(weights = 'inv', matches = 1)                                                            # pair matching
+print(model.estimates)                                                                                          # matching output
+
+# 9
+model = CausalModel(Y,D,X)                                                                                      # define causal model
+model.est_via_matching(weights = 'inv', matches = 3, bias_adj = True)                                           # 1:M matching
+print(model.estimates)                                                                                          # matching output
+
+# 10
+from causalinference import CausalModel
+import pandas as pd                                                                                             # load pandas library
+import numpy as np                                                                                              # load numpy library
+import statsmodels.api as sm                                                                                    # load statsmodels library
+df = pd.read_csv('data/lalonde.csv')                                                                            # load lalonde data
+Y = df['re78']                                                                                                  # define outcome
+D = df['treat']                                                                                                 # define treatment (training)
+X = df[['age', 'educ', 'nodegr', 'married', 'black', 'hisp', 're74', 're75', 'u74', 'u75']]                     # define covariates
+V = sm.add_constant(X)                                                                                          # add a constant to get an intercept
+ps = sm.GLM(D, V, family = sm.families.Binomial()).fit().fittedvalues.astype('float')                           # propensity score by logit
+Y = np.asarray(Y)                                                                                               # causal model needs np array
+D = np.asarray(D)
+ps = np.asarray(ps)      
+model = CausalModel(Y,D,ps)                                                                                     # define causal model
+model.est_via_matching(weights = 'inv', matches = 1, bias_adj = True)                                           # propensity score matching
+print(model.estimates)                                                                                          # show the results
+
+# 11
+import numpy as np                                                                             # load numpy library
+import pandas as pd                                                                            # load pandas library
+from causalinference import CausalModel                                                        # import causal model
+import statsmodels.api as sm                                                                   # load statsmodels library
+from typing import Dict                                                                        # import dict
+from scipy.stats import norm                                                                   # import norm
+def make_bootstraps(data: np.array, n_bootstraps: int=100) -> Dict[str, Dict[str, np.array]]:  # create boot data
+    dc = {}                                                                                    # initiates empty dict
+    sample_size = data.shape[0]                                                                # get sample size  
+    idx = [i for i in range(sample_size)]                                                      # array of index
+    for b in range(n_bootstraps):                                                              # iterating over the number of boot.                                    
+        sidx   = np.random.choice(idx,replace=True,size=sample_size)                           # random index                     
+        b_samp = data.loc[sidx,:]                                                              # select boot sample
+        oob_idx = list(set(idx) - set(sidx))                                                   # get index which where not used
+        t_samp = np.array([])                                                                  # create empty array
+        if oob_idx:                                                                            # if observation where not used
+            t_samp = data.loc[oob_idx,:]                                                       # put them in test sample
+        dc['boot_'+str(b)] = {'boot':b_samp,'test':t_samp}                                     # add boot sample and test sample to dict.
+    return(dc)                                                                                 # return dict.
+df = pd.read_csv('data/lalonde.csv')                                                           # load lalonde data
+df_boot = make_bootstraps(df, 999)                                                             # run 999 boot data
+att = np.array([])                                                                             # create empty array for att values
+for b in df_boot:                                                                              # iterate over boot data
+    Y = df_boot[b]['boot'].loc[:, 're78'].values.reshape(-1,1)                                 # get boot outcome
+    D = df_boot[b]['boot'].loc[:, 'treat'].values.reshape(-1,1)                                # get boot treatment
+    X = df_boot[b]['boot'][['age', 'educ', 'nodegr', 'married', 'black', 'hisp', 're74', 're75', 'u74', 'u75']].values.reshape(-1,10) # get boot covariates
+    V = sm.add_constant(X)                                                                     # add a constant to get an intercept
+    ps = sm.GLM(D, V, family = sm.families.Binomial()).fit().fittedvalues.astype('float')      # propensity score by logit
+    Y = np.asarray(Y)                                                                          # causal model needs np array
+    D = np.asarray(D)
+    ps = np.asarray(ps)      
+    model = CausalModel(Y,D,ps)                                                                # define causal model
+    model.est_via_matching(weights = 'inv', matches = 1, bias_adj = True)                      # propensity score matching
+    att = np.concatenate((att,model.estimates['matching']['att'].flatten()))                   # store att value
+print(f'att: {np.mean(att)}')                                                                  # print mean att
+tstat = np.mean(att)/np.std(att)                                                               # compute t-stat.
+p_val = 2*norm.cdf(-np.absolute(tstat))                                                        # compute p-val.
+print(f'tstat: {tstat}\n'                                                                      # print t-stat.
+      f'p_val: {p_val}')                                                                       # print p-val.
+
+
+# 12
+import pandas as pd                                                                           # load pandas library
+import dowhy as dw                                                                            # load dowhy library
+import numpy as np                                                                            # load numpy library
+df = pd.read_csv('data/lbw.csv')                                                              # load lbw data
+df['race'] = np.where(df['race'] == 1, 1, 0)                                                  # define race as a binary indicator for white/black
+model = dw.CausalModel(data = df,                                                             # define causal model on the data                                      
+                       treatment = 'smoke',                                                   # define treatment (mother smoking)
+                       outcome = 'bwt',                                                       # define outcome (birthweight in grams)
+                       common_causes = ['race', 'age', 'lwt', 'ptl', 'ht', 'ui', 'ftv'])      # define covariates
+identified_estimand = model.identify_effect()                                                 # identify the causal effect to be estimated
+estimate = model.estimate_effect(identified_estimand,                                         # inverse IPW
+                                 method_name = 'backdoor.propensity_score_weighting',         # specify the method
+                                 target_units = 'ate',                                        # specify the target
+                                 method_params = {'weighting_scheme': 'ips_weight'})          # specify the method parameters
+print(estimate.value)                                                                         # show ATE
+print(estimate.get_standard_error())                                                          # show standard error
+print(estimate.test_stat_significance())                                                      # show p-value
+
+# 13
+'''
+no Python code available
+'''
+
+# 14
+import pandas as pd                                             # load pandas library
+import doubleml as dml                                          # load doubleml library
+from sklearn import linear_model                                # load linear_model from sklearn
+df = pd.read_csv('data/lbw.csv')                                # load lbw data
+df['race'] = np.where(df['race'] == 1, 1, 0)                    # define race as a binary indicator for white/black
+X = df.loc[:, ['race', 'age', 'lwt', 'ptl', 'ht', 'ui', 'ftv']] # select covariates
+dml_data = dml.DoubleMLData(data = df,                          # create dml_data from lbw data
+                            y_col = 'bwt',                      # select outcome
+                            d_cols = 'smoke',                   # select treatment
+                            x_cols = list(X.columns.values))    # select covariates
+ml_l = linear_model.LinearRegression()                          # define learner for E[Y|X]
+ml_m = linear_model.LogisticRegression(max_iter = 350)          # define learner for E[D|X]
+dr = dml.DoubleMLPLR(dml_data,                                  # double machine learning
+                     ml_l,                                      # specify outcome model
+                     ml_m).fit()                                # specify treatment model, fit the model
+print(dr.summary)                                               # show the results
+
+# 15
+import pandas as pd                                                          # load pandas library
+import statsmodels.api as sm                                                 # load statsmodels library
+import numpy as np                                                           # load numpy library
+import matplotlib.pyplot as plt                                              # load matplotlib library
+df = pd.read_csv('data/lbw.csv')                                             # load lbw data
+df['race'] = np.where(df['race'] == 1, 1, 0)                                 # define race as a binary indicator for white/black
+D = df['smoke']                                                              # define treatment (mother smoking)
+Y = df['bwt']                                                                # define outcome (birthweight in grams)
+X = df[['race', 'age', 'lwt', 'ptl', 'ht', 'ui', 'ftv']]                     # define covariates
+V = sm.add_constant(X)                                                       # add a constant to get an intercept
+ps = sm.GLM(D, V, family = sm.families.Binomial()).fit().fittedvalues        # propensity score by logit
+df['ps'] = ps                                                                # add propensity score to dataframe
+df_treated = df.loc[df['smoke'] == 1]                                        # select treated group
+df_nontreated = df.loc[df['smoke'] == 0]                                     # select non-treated group
+psdens1= sm.nonparametric.KDEUnivariate(df_treated['ps']).fit()              # density of propensity score among treated
+psdens0 = sm.nonparametric.KDEUnivariate(df_nontreated['ps']).fit()          # density of propensity score among non-treated
+fit, axs = plt.subplots(2,2)                                                 # specify a figure with four graphs (2x2)
+axs[0, 0].plot(psdens1.density, color = 'black')                             # plot density of ps among treated
+axs[0, 0].set_title('Density of ps among treated')                           # set title
+axs[0, 0].set(ylabel = 'Density')                                            # set y label
+axs[0, 1].plot(psdens0.density, color = 'black')                             # plot density of ps among non-treated
+axs[0, 1].set_title('Density of ps among non-treated')                       # set title
+axs[0, 1].set(ylabel = 'Density')                                            # set y label
+axs[1, 0].hist(df_treated['ps'], color = 'black')                            # plot histogram of ps among treated
+axs[1, 0].set_title('Histogram of ps among treated')                         # set title
+axs[1, 0].set(ylabel = 'Frequency')                                          # set y label
+axs[1, 1].hist(df_nontreated['ps'], color = 'black')                         # plot histogram of ps among non-treated
+axs[1, 1].set_title('Histogram of ps among non-treated')                     # set title
+axs[1, 1].set(ylabel = 'Frequency')                                          # set y label
+plt.show()                                                                   # show plot
+psdens1.bw                                                                   # print the bandwidth for treated
+psdens0.bw                                                                   # print the bandwidth for non-treated
+df_treated['ps'].describe()                                                  # summary stat. for p-scores among treated
+df_nontreated['ps'].describe()                                               # summary stat. for p-scores among non-treated
+
+# 16
+from causalinference import CausalModel                                      # load causalmodel
+import pandas as pd                                                          # load pandas library
+import numpy as np                                                           # load numpy library
+import statsmodels.api as sm                                                 # load statsmodels library
+import matplotlib.pyplot as plt                                              # load matplotlib library
+df = pd.read_csv('data/lbw.csv')                                             # load lbw data
+df['race'] = np.where(df['race'] == 1, 1, 0)                                 # define race as a binary indicator for white/black
+D = df['smoke']                                                              # define treatment (mother smoking)
+Y = df['bwt']                                                                # define outcome (birthweight in grams)
+X = df[['race', 'age', 'lwt', 'ptl', 'ht', 'ui', 'ftv']]                     # define covariates
+V = sm.add_constant(X)                                                       # add a constant to get an intercept
+ps = sm.GLM(D, V, family = sm.families.Binomial()).fit().fittedvalues        # propensity score by logit
+df['ps'] = ps                                                                # add propensity scores to dataframe
+Y = np.asarray(Y)                                                            # causal model needs np array
+D = np.asarray(D)
+ps = np.asarray(ps)    
+model = CausalModel(Y,D,ps)                                                  # define causal model
+model.est_via_matching(weights = 'inv', matches = 1)                         # propensity score matching
+model.est_propensity()                                                       # estimate prop. scores
+df['matched_ps'] = model.propensity['fitted']                                # add matched prop. scores to dataframe
+df_treated = df.loc[df['smoke'] == 1]                                        # select treated group
+df_nontreated = df.loc[df['smoke'] == 0]                                     # select non-treated group
+fit, axs = plt.subplots(2,2)                                                 # specify a figure with four graphs (2x2)
+axs[0, 0].hist(df_treated['ps'], color = 'black')                            # plot ps among treated
+axs[0, 0].set_title('Raw treated')                                           # set title
+axs[0, 0].set(ylabel = 'Proportion')                                         # set y label
+axs[0, 0].set(xlabel = 'Propensity score')                                   # set x label
+axs[0, 1].hist(df_treated['matched_ps'], color = 'black')                    # plot ps after matching among treated
+axs[0, 1].set_title('Matched treated')                                       # set title
+axs[0, 1].set(ylabel = 'Proportion')                                         # set y label
+axs[0, 1].set(xlabel = 'Propensity score')                                   # set x label
+axs[1, 0].hist(df_nontreated['ps'], color = 'black')                         # plot ps among non-treated
+axs[1, 0].set_title('Raw control')                                           # set title
+axs[1, 0].set(ylabel = 'Proportion')                                         # set y label
+axs[1, 0].set(xlabel = 'Propensity score')                                   # set x label
+axs[1, 1].hist(df_nontreated['matched_ps'], color = 'black')                 # plot ps after matching among non-treated
+axs[1, 1].set_title('Matched control')                                       # set title
+axs[1, 1].set(ylabel = 'Proportion')                                         # set y label
+axs[1, 1].set(xlabel = 'Propensity score')                                   # set x label
+plt.show()                                                                   # show plot
+
+# 17
+'''
+no Python code available
+'''
+
+# 18
+import pandas as pd                                                          # load pandas library
+import numpy as np                                                           # load numpy library
+from zepid.causal.ipw import IPTW                                            # load iptw method from zepid library
+from zepid.calc import counternull_pvalue                                    # load counternull_pvalue method
+df = pd.read_csv('data/lbw.csv')                                             # load lbw data
+df['race'] = np.where(df['race'] == 1, 1, 0)                                 # define race as a binary indicator for white/black
+ipw = IPTW(df, treatment = 'smoke', outcome = 'ptl')                         # define ipw model
+ipw.treatment_model('race + age + lwt + ptl + ht + ui + ftv',                # covariates
+                    print_results = False)                                   # don't print results
+ipw.marginal_structural_model('smoke')                                       # treatment
+ipw.fit()                                                                    # fit the model
+ipw.summary()                                                                # show ATE
+counternull_pvalue(0.117, -0.274, 0.186)                                     # calculate p-val. based on SE and CI
+
+# 19
+'''
+no Python code available
+'''
+
+# 20
+from econml.dml import DML                                                              # load DML
+from econml.sklearn_extensions.linear_model import StatsModelsLinearRegression          # load StatsModelsLinearReg.
+import pandas as pd                                                                     # load pandas library
+df = pd.read_csv('data/games.csv')                                                      # load games data
+games_nomis = df.dropna()                                                               # drop missings
+games_nomis.loc[:, 'is_action'] = (games_nomis.loc[:, 'genre'] == 'Action').astype(int) # create dummy for genre 'Action'
+Y = games_nomis.loc[:,'sales'].values.ravel()                                           # define outcome
+D = games_nomis.loc[:,'metascore'].values.ravel()                                       # define treatment
+X = games_nomis.loc[:, ['is_action', 'year', 'userscore']]                              # define covariates
+est = DML(model_y = 'auto',                                                             # create DML model, WeightedLassoCV for learner E[Y|X]
+          model_t = 'auto',                                                             # WeigtedMultiTaskLassoCV for learner E[D|X]
+          model_final = StatsModelsLinearRegression(fit_intercept=False),               # learner for fitting the outcome residuals to the treatment residuals
+          discrete_treatment = False)                                                   # continuous treatment
+est = est.fit(Y = Y, T = D, X = X)                                                      # fit DML model on games data                                       
+ATE = est.effect(X = X, T0 = 0, T1 = 100)                                               # estimate treatment effect
+lb, ub = est.effect_interval(X = X, T0 = 0, T1 = 100)                                   # estimate interval for treatment effect
+df = list(zip(D,ATE, lb, ub))                                                           # join above results
+df = pd.DataFrame(df).astype(float)                                                     # create dataframe with them
+ate = df.groupby([0]).agg({1: 'mean', 2: 'mean', 3: 'mean'})                            # mean treatment effects and intervals
+plt.figure()                                                                            # create the plot
+ate[1].plot(label = 'ate', color = 'black', linewidth = 2)                              # add treatment line
+ate[2].plot(label = 'lb', color = 'gray', linestyle = '--')                             # add lower bracket
+ate[3].plot(label = 'ub', color = 'gray', linestyle = '--')                             # add upper bracket
+plt.xlabel('Treatment level A = a')                                                     # set x label
+plt.ylabel('E(Y^a)')                                                                    # set y label
+plt.show()                                                                              # show the plot
+
+# 21
+import pandas as pd                                                              # load pandas library
+import numpy as np                                                               # load numpy library
+import doubleml as ml                                                            # load doubleml library
+import multiprocessing                                                           # load multiprocessing library
+from matplotlib import pyplot as plt                                             # load pyplot library
+from sklearn.linear_model import LogisticRegression                              # load logistic reg. method
+df = pd.read_csv('data/games.csv')                                               # load lbw data
+games_nomis = df.dropna()                                                        # drop missings
+games_nomis['metascore'] = games_nomis['metascore'] > 75                         # define binary treatment
+games_nomis.loc[:, 'is_action'] = (games_nomis['genre'] == 'Action').astype(int) # transform action in binary var.
+dml_data = ml.DoubleMLData(games_nomis,                                          # create dml data
+                           y_col = 'sales',                                      # define outcome
+                           d_cols = 'metascore',                                 # define treatment
+                           x_cols = ['year', 'userscore', 'is_action'])          # define covariates
+ml_g = LogisticRegression()                                                      # learner for nuisance elements
+ml_m = LogisticRegression()                                                      # learner for prop. nuisance fcts
+tau_vect = np.arange(0.1, 1, 0.05)                                               # ranks where we want to estiamte QTE
+ncores = multiprocessing.cpu_count()                                             # how many cpu computer has
+cores_used = np.min([5, ncores-1])                                               # how many cores we will use
+qte = ml.DoubleMLQTE(dml_data,                                                   # QTE, specify the data
+                     ml_g,                                                       # learner for nuisance elements
+                     ml_m,                                                       # learner for prop. nuisance fcts
+                     quantiles=tau_vect).fit()                                   # ranks, fit the QTE to our data
+print(qte)                                                                       # show results
+ci_qte = qte.confint(level = 0.95)                                               # confidence intervals
+data = {'Quantile': tau_vect,                                                    # create df for plotting, add ranks
+        'QTE': qte.coef,                                                         # add the estimated QTE
+        'ci_lower': ci_qte['2.5 %'],                                             # add lower ci
+        'ci_upper': ci_qte['97.5 %']}                                            # add upper ci
+df = pd.DataFrame(data)                                                          # generate pd dataframe
+horiz = np.zeros(len(tau_vect))                                                  # to draw horizontal line
+fig, ax = plt.subplots()                                                         # create plot
+ax.plot(df['Quantile'], df['QTE'], color = 'black', marker = 'o')                # add QTE line
+ax.plot(df['Quantile'], df['ci_lower'], color = 'black', linestyle='--')         # add lower CI
+ax.plot(df['Quantile'], df['ci_upper'], color = 'black', linestyle='--')         # add upper CI
+ax.plot(df['Quantile'], horiz, color = 'black')                                  # add horizontal line
+ax.set_xlabel('Tau')                                                             # set x-axis
+ax.set_ylabel('QTE')                                                             # set y-axis
+plt.show()                                                                       # show the plot
+
+# 22
+'''
+no Python code available
+'''
+
+# 23
+'''
+no Python code available
+'''
+
+# 24
+import pandas as pd                                                              # load pandas library
+import statsmodels.api as sm                                                     # load statsmodels library
+from statsmodels.stats.mediation import Mediation                                # load mediation model
+df = pd.read_csv('data/wexpect.csv')                                             # load wexpect data
+outcome_model = sm.OLS.from_formula('wexpect2 ~ male + age + swiss + motherhighedu + fatherhighedu + business + econ + communi + businform', # outcome formula
+                                    data = df)                                   # specify the data
+mediator_model = sm.OLS.from_formula('business ~ econ + communi + businform + male', # mediator formula
+                                     data = df)                                  # specify the data
+model = Mediation(outcome_model,                                                 # mediation analysis, add outcome formula
+                  mediator_model,                                                # add mediator formula
+                  exposure = 'male').fit()                                       # add exposure, fit to our data
+model.summary()                                                                  # output
+
+# Chapter 5
+
+# 25
+import pandas as pd                                                # load pands library
+import doubleml as dml                                             # load doubleml library
+from sklearn import linear_model                                   # load linear model from sklearn
+df = pd.read_csv('data/JC.csv')                                    # load JC data
+X = df.iloc[:, 1:29]                                               # define covariates
+dml_data = dml.DoubleMLData(df,                                    # create dml data from JC data
+                            y_col = 'health48',                    # define outcome
+                            d_cols = 'trainy1',                    # define treatment
+                            x_cols = list(X.columns.values))       # define covariates
+ml_m = linear_model.LogisticRegressionCV(penalty='l1',             # define learner for E[D|X], norm of the penalty
+                                         solver='saga',            # solver for multinomial loss
+                                         max_iter=300,             # max. number of iterations
+                                         Cs=1,                     # inverse of regularization strength
+                                         tol=1e-3)                 # tolerance for stopping criteria
+ml_l = linear_model.LassoCV()                                      # define learner for E[Y|X]
+dml_lasso = dml.DoubleMLPLR(dml_data,                              # double machine learning, add our data
+                            ml_l,                                  # add the learner for E[Y|X]
+                            ml_m,                                  # add the learner for E[D|X]
+                            n_folds = 3).fit()                     # specify number of folds for cv, fit to our data
+print(dml_lasso.summary)                                           # output
+
+# 26
+from sklearn import ensemble                                       # load ensemble from sklearn
+ml_l = ensemble.RandomForestRegressor()                            # define learner for E[Y|X]
+ml_m = ensemble.RandomForestRegressor()                            # define learner for E[D|X]
+dml_rfg = dml.DoubleMLPLR(dml_data,                                # double machine learning
+                            ml_l,                                  # add the learner for E[Y|X]
+                            ml_m,                                  # add the learner for E[D|X]
+                            n_folds = 3).fit()                     # specify number of folds for cv, fit to our data
+print(dml_rfg.summary)                                             # output
+
+# 27
+import pandas as pd                                                                                     # load pands library
+import math                                                                                             # import math library
+from sklearn.ensemble import RandomForestClassifier                                                     # import rf classifier
+from sklearn.ensemble import GradientBoostingRegressor                                                  # import gb regressor
+from econml.dml import CausalForestDML                                                                  # import dml causal forest
+from scipy.stats import norm                                                                            # import norm
+df = pd.read_csv('data/JC.csv')                                                                         # load JC data        
+df.columns = df.columns.astype(str)                                                                     # cast column names to string
+Y = df.iloc[:, 39]                                                                                      # define outcome (pworky3)
+D = df.iloc[:, 36]                                                                                      # define treatment (trainy1)
+X = df.iloc[:, 1:29]                                                                                    # define covariates
+educ = pd.get_dummies(X['educ'])                                                                        # one-hot-encoding...
+hhsize = pd.get_dummies(X['hhsize'])                                                                    # for the scikit-learn implementation...
+educmum = pd.get_dummies(X['educmum'])                                                                  # of all categorical variables
+educdad = pd.get_dummies(X['educdad'])                                                                  # one-hot-encoding
+welfarechild = pd.get_dummies(X['welfarechild'])                                                        # one-hot encoding
+health = pd.get_dummies(X['health'])                                                                    # one-hot-encoding
+smoke = pd.get_dummies(X['smoke'])                                                                      # one-hot-encoding
+alcohol = pd.get_dummies(X['alcohol'])                                                                  # one-hot-encoding
+X.drop(columns = ['educ', 'hhsize', 'educmum', 'educdad', 'welfarechild', 'health', 'smoke', 'alcohol'],# delete categorical variables
+       axis = 1,                                                                                        # column axis
+       inplace = True)                                                                                  # dont return a copy, do it on original df
+X = pd.concat([X, educ, hhsize, educmum, educdad, welfarechild, health, smoke, alcohol], axis = 1)      # add their one-hot-encoding
+X.columns = X.columns.astype(str)                                                                       # cast column names to string
+cf = CausalForestDML(n_estimators = 2000,                                                               # create causalforest object, num. trees in r
+                     min_samples_leaf = 5,                                                              # min.node.size in r
+                     max_depth = min(round(math.sqrt(len(X.columns))) + 20, len(X.columns)),            # mtry in r
+                     model_t = RandomForestClassifier(max_depth = 5,                                    # define learner for E[D|X]
+                                                      min_samples_leaf = 10,                            # tune parameters of leaner
+                                                      random_state = 123),                              # tune parameters of learner
+                     model_y = GradientBoostingRegressor(min_samples_leaf = 30,                         # define learner for E[Y|X]
+                                                         n_estimators = 50,                             # tune parameters of learner
+                                                         random_state = 123),                           # tune parameters of learner
+                     discrete_treatment = True,                                                         # D is binary
+                     drate = True)                                                                      # compute ATE at fit time
+cf.fit(Y = Y, T = D, X = X)                                                                             # fit causalforest on JC data
+ATE = cf.ate_                                                                                           # store ATE
+SE = cf.ate_stderr_                                                                                     # store std. error of ATE
+pval = 2*norm.cdf(-abs(ATE/SE))                                                                         # compute p-value
+print(ATE, SE, pval)                                                                                    # show the results
+
+# 28
+import matplotlib.pyplot as plt                             # load matplotlib library
+CATE = cf.effect(X)                                         # compute cate on the JC data
+plt.hist(CATE, color = 'gray', bins = 16, rwidth = 0.9)     # create histogram of cate
+plt.xlabel('CATE')                                          # set x-axis name
+plt.ylabel('Frequency')                                     # set y-axis name
+plt.title('Histogram of CATE')                              # set title
+plt.show()                                                  # show the plot
+
+# 29
+import numpy as np                                       # load numpy library
+import statsmodels.api as sm                             # load statsmodels library
+highCATE = (CATE > np.median(CATE)).astype(int)          # dummy for high CATE
+highCATE = sm.add_constant(highCATE)                     # add constant to get an intercept
+ols = sm.OLS(df['age'], highCATE).fit(cov_type = 'HC0')  # run OLS regression with White's heteroskedasticity robust se
+print(ols.summary())                                     # output
+
+# 30
+'''
+no Python code available
+'''
+
+# 31
+cf.cate_feature_names()  # show features importance
+
+# 32
+'''
+no Python code available
+'''
+
+# Chapter 6
+
+# 33
+import pandas as pd                                                # load pands library
+df = pd.read_csv('data/JC.csv')                                    # load JC data
+Z = df['assignment']                                               # define instrument
+D = df['trainy1']                                                  # define treatment
+Y = df['earny4']                                                   # define outcome
+ITT = Y[Z==1].mean() - Y[Z==0].mean()                              # estimate intention-to-treat effect
+first = D[Z==1].mean() - D[Z==0].mean()                            # estimate first stage effect (complier share)
+LATE = ITT/first                                                   # compute LATE
+print(ITT, first, LATE)                                            # show ITT, first stage effect and LATE
+
+# 34
+import statsmodels.api as sm                                       # load statsmodels library
+import linearmodels.iv.model as lm                                 # load linearmodels library
+import pandas as pd                                                # load pands library
+df = pd.read_csv('data/JC.csv')                                    # load JC data
+df = sm.add_constant(data = df, prepend = False)                   # add a constant to get an intercept
+ivreg = lm.IV2SLS(dependent = df['earny4'],                        # dependent variable
+                 endog = df['trainy1'],                            # endogeneous var.
+                 exog = df['const'],                               # exogeneous var.
+                 instruments = df['assignment'])                   # instrument
+LATE = ivreg.fit(cov_type = 'robust')                              # run 2SLS with hetero.-robust se
+LATE.summary                                                       # results
+
+# 35
+'''
+no Python code available
+'''
+
+# 36
+import numpy as np                                                                                  # load numpy library
+import pandas as pd                                                                                 # load pandas library
+import doubleml as dml                                                                              # load doubleml library
+from sklearn.ensemble import GradientBoostingRegressor                                              # import gb regressor
+from sklearn.base import clone                                                                      # import clone
+learner = GradientBoostingRegressor()                                                               # define learner as gb regressor
+ml_l = clone(learner)                                                                               # learner for E[Y|X]
+ml_m = clone(learner)                                                                               # learner for E[Z|X]
+ml_r = clone(learner)                                                                               # learner for E[D|X]
+np.random.seed(1)                                                                                   # set seed
+df = pd.read_csv('data/c401k.csv')                                                                  # load c401k data
+X = df.iloc[:, 4:11]                                                                                # covariates                        
+obj_dml_data = dml.DoubleMLData(df,                                                                 # create double-machine learning object
+                                y_col = 'nettfa',                                                   # define outcome
+                                d_cols = 'p401k',                                                   # define treatment
+                                x_cols = list(X.columns.values),                                    # define covariates
+                                z_cols = 'e401k')                                                   # define instrument
+dml_pliv_obj = dml.DoubleMLPLIV(obj_dml_data, ml_l, ml_m, ml_r).fit()                               # fit
+print(dml_pliv_obj.summary)                                                                         # print the results
+
+# 37
+'''
+no Python code available
+'''
+
+# Chapter 7
+
+# 38
+import numpy as np                                                     # load numpy library
+import pandas as pd                                                    # load pandas library
+import statsmodels.api as sm                                           # load statsmodels
+df = pd.read_csv('data/kielmc.csv')                                    # load kielmc data
+Y = df['rprice']                                                       # define outcome
+D = df['nearinc']                                                      # define treatment group
+T = df['y81']                                                          # define period dummy
+df['interact'] = D * T                                                 # treatment-period interaction
+x = df[['nearinc', 'y81', 'interact']]                                 # creating x var. with D, T and interact
+x = sm.add_constant(x)                                                 # adding constant to get an intercept
+cluster_var = df['cbd']                                                # cluster variable
+ols = sm.OLS(Y, x).fit(cov_type='cluster',                             # did
+                       cov_kwds={'groups': cluster_var})               # with cluster st.error 
+print(ols.summary())                                                   # print the results
+
+# 39
+'''
+no Python code available
+'''
+
+# 40
+'''
+no Python code available
+'''
+
+# 41
+'''
+no Python code available
+'''
+
+# Chapter 8
+
+# 42
+import pandas as pd                               # load pandas library
+import numpy as np                                # load numpy library
+from synthdid.synthdid import Synthdid as sdid    # load synthdid library
+from synthdid.get_data import california_prop99   # load california data
+np.random.seed(1)                                 # set seed
+out = sdid(california_prop99(),                   # synthetic did
+           unit="State",                          # define unit
+           time="Year",                           # define time
+           treatment="treated",                   # define treatment
+           outcome="PacksPerCapita")              # define outcome
+out = out.fit().vcov(method='placebo')            # placebo se 
+out.summary().summary2                            # show results
+
+# 43
+import pandas as pd                                       # load pandas library
+import numpy as np                                        # load numpy library
+from synthdid.synthdid import Synthdid as sdid            # load synthdid library
+from synthdid.get_data import california_prop99           # load california data
+import matplotlib.pyplot as plt                           # load matplotlib library
+np.random.seed(1)                                         # set seed
+out = sdid(california_prop99(),                           # synthetic did
+           unit="State",                                  # define unit
+           time="Year",                                   # define time
+           treatment="treated",                           # define treatment
+           outcome="PacksPerCapita")                      # define outcome
+out.weights = np.zeros(19)                                # set weights
+out.fit(omega_intercept = False).vcov(method = 'placebo') # placebo se 
+print(out.summary().summary2)                             # show results
+out.plot_outcomes()                                       # plot results
+
+# 44
+from rdrobust import rdrobust,rdplot                                            # load rdrobust library
+import pandas as pd                                                             # load pandas library
+df = pd.read_csv('data/rdrobust_RDsenate.csv')                                  # load data
+R = df.margin                                                                   # running var. = margin of winning
+Y = df.vote                                                                     # outcome = vote share of democrats
+results = rdrobust(y=Y, x=R)                                                    # sharp rdd
+print(results)                                                                  # show results
+rdplot(y=Y, x=R)                                                                # plot results
+
+# 45
+'''
+no Python code available
+'''
+
+# 46
+import pandas as pd                                              # load pandas library
+import numpy as np                                               # load numpy library
+from rdrobust import rdrobust                                    # load rdrobust library
+df = pd.read_csv('data/rcp.csv')                                 # load rcp data
+Y = df['cn']                                                     # outcome
+R = df['elig_year']                                              # running var.
+D = df['retired']                                                # treatment
+results = rdrobust(y=Y, x=R, fuzzy=D)                            # fuzzy rdd
+print(results)                                                   # show results
+
+# 47
+import pandas as pd                                                   # load pandas library
+from rdrobust import rdrobust                                         # load rdrobust library
+df = pd.read_csv('data/rkd.csv')                                      # load rdk data
+Y = df['pers_total']                                                  # outcome
+R = df['forcing']                                                     # running var.
+D = df['costequalgrants']                                             # treatment
+results = rdrobust(y=Y, x=R, fuzzy=D, deriv=1)                        # fuzzy RKD
+print(results)                                                        # show results
+
+# 48
+'''
+no Python code available
+'''
+
+# 49
+'''
+no Python code available
+'''
+
+# 50
+'''
+no Python code available
+'''
+
+# 51
+'''
+no Python code available
+'''
+
+# 52
+'''
+no Python code available
+'''
+
+
+
+
